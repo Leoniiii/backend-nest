@@ -6,10 +6,14 @@ import { User } from './entities/user.entity';
 import { Model } from 'mongoose';
 import * as bcryptjs from 'bcryptjs'
 import { LoginDto } from './dto/login.dto';
+import { JwtService } from '@nestjs/jwt';
+import { JwtPayload } from './interfaces/jwt-payload';
+import { LoginResponse } from './interfaces/login-response';
+import { RegisterDto } from './dto';
 
 @Injectable()
 export class AuthService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) { }
+  constructor(@InjectModel(User.name) private userModel: Model<User>, private jwtService: JwtService) { }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
     try {
@@ -33,22 +37,31 @@ export class AuthService {
     }
   }
 
-  async login(loginDto: LoginDto) {
-    const {email, password} = loginDto
-    const user = await this.userModel.findOne({email})
-    if(!user) {
+  async register(registerDto: RegisterDto): Promise<LoginResponse> {
+    const user = await this.create(registerDto);
+    console.log('REGISTER', user)
+    return {
+      user: user,
+      token: this.getJwtToken({ id: user._id })
+    }
+  }
+
+
+  async login(loginDto: LoginDto): Promise<LoginResponse> {
+    const { email, password } = loginDto
+    const user = await this.userModel.findOne({ email })
+    if (!user) {
       throw new UnauthorizedException('Not valid credential -> email')
     }
-    if(!bcryptjs.compareSync(password, user.password)) {
+    if (!bcryptjs.compareSync(password, user.password)) {
       throw new UnauthorizedException('Not valid credential -> password')
 
     }
-    const { password:_, ...rest } =user.toJSON()
-    console.log(user.toJSON())
+    const { password: _, ...rest } = user.toJSON()
 
     return {
-      ...rest,
-      token: 'ABC-123'
+      user: rest,
+      token: this.getJwtToken({ id: user.id })
     }
     /**
      * User {_id, name, email, roles}
@@ -56,8 +69,17 @@ export class AuthService {
      */
   }
 
-  findAll() {
-    return `This action returns all authADSFDASFADS`;
+
+
+  findAll(): Promise<User[]> {
+    return this.userModel.find();
+  }
+
+  async findUserById(id: string) {
+    const user = await this.userModel.findById(id)
+    const { password, ...rest } = user.toJSON();
+    return rest
+
   }
 
   findOne(id: number) {
@@ -70,5 +92,10 @@ export class AuthService {
 
   remove(id: number) {
     return `This action removes a #${id} auth`;
+  }
+
+  getJwtToken(payload: JwtPayload) {
+    const token = this.jwtService.sign(payload);
+    return token
   }
 }
