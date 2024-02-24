@@ -31,7 +31,7 @@ export class AuthGuard implements CanActivate {
       // so that we can access it in our route handlers
       request['user'] = user;
     } catch {
-      throw new UnauthorizedException('Esto es un error generico');
+      throw new UnauthorizedException();
     }
     return true;
   }
